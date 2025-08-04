@@ -16,16 +16,19 @@
 ```bash
 go run cmd/app/main.go
 ```
+
 ## Маршруты 
 
 ### Запуск задачи
+
 ```
 GET /api/v1/start HTTP/1.1
 Host: localhost:8080
 ```
+
 ### Получить статус задачи
+
 ```
 GET /api/v1/status/{process_id} HTTP/1.1
 Host: localhost:8080
-
 ```
