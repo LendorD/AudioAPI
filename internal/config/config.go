@@ -11,6 +11,7 @@ import (
 type ServerConfig struct {
 	Port           string
 	AllowedOrigins []string
+	AuthToken      string
 }
 
 type Config struct {
@@ -86,6 +87,7 @@ func LoadConfig() (*Config, error) {
 				"http://127.0.0.1:3000",
 				"http://127.0.0.1:5173",
 			},
+			AuthToken: getEnv("AUTH_TOKEN", ""),
 		},
 	}
 

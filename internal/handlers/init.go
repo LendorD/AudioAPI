@@ -3,9 +3,10 @@ package handlers
 import (
 	"GoRoutine/internal/config"
 	"GoRoutine/internal/interfaces"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"net/http"
 )
 
 var validate *validator.Validate
@@ -16,12 +17,14 @@ func init() {
 
 type Handler struct {
 	usecase interfaces.Usecases
+	cfg     *config.Config
 }
 
 // NewHandler создает новый экземпляр Handler со всеми зависимостями
-func NewHandler(usecase interfaces.Usecases) *Handler {
+func NewHandler(usecase interfaces.Usecases, cfg *config.Config) *Handler {
 	return &Handler{
 		usecase: usecase,
+		cfg:     cfg,
 	}
 }
 
@@ -40,8 +43,12 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 
 	baseRouter := r.Group("/api/v1")
 
-	baseRouter.GET("/start", h.Start)
-	baseRouter.GET("/status/:proc_id", h.GetStatus)
+	authorized := baseRouter.Group("/")
+	authorized.Use(h.authMiddleware())
+	{
+		authorized.GET("/start", h.Start)
+		authorized.GET("/status/:proc_id", h.GetStatus)
+	}
 
 	return r
 }
