@@ -4,9 +4,10 @@ import (
 	"GoRoutine/internal/cache"
 	"GoRoutine/internal/domain/entities"
 	"GoRoutine/internal/interfaces"
-	"github.com/gofrs/uuid"
 	"os/exec"
 	"time"
+
+	"github.com/gofrs/uuid"
 )
 
 type ProcessUsecase struct {
@@ -23,8 +24,7 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 
 	startTime := time.Now()
 
-	arg1 := id.String()
-	arg2 := time.Now().Format("2006-01-02 15:04:05")
+	arg1 := "test.mp3"
 
 	// Сохраняем процесс как запущенный
 	uc.Cache.Set(id, &entities.ProcessStatus{
@@ -33,7 +33,8 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 	})
 
 	go func(pid uuid.UUID) {
-		cmd := exec.Command("./testproc.exe", arg1, arg2)
+		cmd := exec.Command("/venv/bin/python", "./python-scripts/script.py", arg1)
+
 		// Собираем stdout и stderr
 		out, err := cmd.CombinedOutput()
 
@@ -46,7 +47,7 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 		}
 
 		if err != nil {
-			status.Data = "[ERROR]: " + err.Error()
+			status.Data = "[ERROR]: " + err.Error() + "\n" + string(out)
 		}
 
 		// Обновляем статус в кэше
