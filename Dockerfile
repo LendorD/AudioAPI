@@ -1,51 +1,46 @@
-# 1. Базовый образ с Go и Python
-FROM golang:1.24-alpine AS builder
+# ------------------------
+# 1. Stage: Build Go API
+# ------------------------
+FROM golang:1.24-alpine AS go-builder
 
-# 2. Устанавливаем зависимости
-RUN apk update && apk add --no-cache \
-    ca-certificates \
-    git \
-    openssh \
-    python3 \
-    py3-pip \
-    python3-dev \
-    build-base
-
-# 3. Рабочая директория
 WORKDIR /app
 
-# 4. Копируем go.mod и go.sum
-COPY go.mod go.sum ./
+# Устанавливаем зависимости для Go
+RUN apk add --no-cache git
 
-# 5. Загружаем зависимости Go
+COPY go.mod go.sum ./
 RUN go mod download
 
-# 6. Копируем весь проект
 COPY . .
+RUN go build -o app
 
-# 7. Создаём виртуальное окружение Python и ставим зависимости
-RUN python3 -m venv /venv \
-    && . /venv/bin/activate \
-    && pip install --upgrade pip \
-    && pip install -r python-scripts/requirements.txt
+# ------------------------
+# 2. Stage: Final image with Go + Python venv
+# ------------------------
+FROM python:3.10-slim AS final
 
-# 8. Собираем Go бинарь
-RUN go build -o main .
+WORKDIR /app
 
-# 9. Финальный образ
-FROM alpine:latest
+# Устанавливаем Go runtime (для запуска скомпилированного бинарника не нужно всё окружение Go)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libsndfile1 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /root/
+# Создаём venv для Python
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Копируем бинарь
-COPY --from=builder /app/main .
-# Копируем виртуальное окружение Python
-COPY --from=builder /venv /venv
+# Устанавливаем зависимости Python
+COPY python-scripts/requirements.txt /python-scripts/
+RUN pip install --no-cache-dir -r /python-scripts/requirements.txt
+
+# Копируем бинарь Go
+COPY --from=go-builder /app/app .
+
 # Копируем Python-скрипты
-COPY --from=builder /app/python-scripts ./python-scripts
+COPY python-scripts/ ./python-scripts/
 
-# Указываем переменную окружения для Python
-ENV PATH="/venv/bin:$PATH"
-
-# Запуск
-CMD ["./main"]
+# Запуск Go API
+CMD ["./app"]
