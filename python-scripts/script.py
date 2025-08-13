@@ -4,7 +4,7 @@ import tempfile
 import numpy as np
 import librosa
 import torch
-from vosk import Model, KaldiRecognizer
+from vosk import Model, KaldiRecognizer, SetLogLevel
 import json
 import wave
 import subprocess
@@ -12,6 +12,9 @@ from pathlib import Path
 import sys
 from typing import List, Dict, Any
 from scipy.cluster.hierarchy import fcluster, linkage  # Альтернатива для кластеризации
+
+# отключаем логи для vosk
+SetLogLevel(-1)
 
 # утсановка кодировки
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -217,7 +220,7 @@ def main():
     segments = analyze_audio_file(audio_path, num_speakers, vad_threshold)
 
     # Вывод в JSON (с отступами для читаемости)
-    print("-START-")
+    # print("-START-")
     # print(segments)
     print(json.dumps(segments, indent=2, ensure_ascii=False))
 
