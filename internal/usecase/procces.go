@@ -35,7 +35,7 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 	})
 	go func(pid uuid.UUID) {
 		//					"python"
-		cmd := exec.Command("python", "python-scripts\\script.py", arg1)
+		cmd := exec.Command("python", "python-scripts/script.py", arg1)
 		cmd.Env = append(os.Environ(),
 			"PATH=C:\\Users\\dlucenko\\Desktop\\AudioAPI\\AudioAPI\\venv\\Scripts;"+os.Getenv("PATH"))
 
