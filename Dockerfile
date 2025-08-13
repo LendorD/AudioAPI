@@ -8,11 +8,16 @@ WORKDIR /app
 # Устанавливаем зависимости для Go
 RUN apk add --no-cache git
 
+# Копируем только файлы модулей и качаем зависимости
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Копируем исходники
 COPY . .
-RUN go build -o app
+
+# Сборка приложения
+RUN go build -o app ./cmd/app/main.go
+
 
 # ------------------------
 # 2. Stage: Final image with Go + Python venv
@@ -21,7 +26,7 @@ FROM python:3.10-slim AS final
 
 WORKDIR /app
 
-# Устанавливаем Go runtime (для запуска скомпилированного бинарника не нужно всё окружение Go)
+# Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libsndfile1 \
@@ -36,11 +41,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY python-scripts/requirements.txt /python-scripts/
 RUN pip install --no-cache-dir -r /python-scripts/requirements.txt
 
-# Копируем бинарь Go
+# Копируем Go бинарь
 COPY --from=go-builder /app/app .
 
 # Копируем Python-скрипты
 COPY python-scripts/ ./python-scripts/
+
+# Копируем .env (только сюда, на runtime)
+COPY .env .env
 
 # Запуск Go API
 CMD ["./app"]
