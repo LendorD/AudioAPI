@@ -47,6 +47,7 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 	authorized.Use(h.authMiddleware())
 	{
 		authorized.GET("/start", h.Start)
+		authorized.POST("/start", h.StartWithFile)
 		authorized.GET("/status/:proc_id", h.GetStatus)
 	}
 

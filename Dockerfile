@@ -31,7 +31,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libsndfile1 \
     ffmpeg \
+    libsox-fmt-all \
+    libtorch-dev \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Создаём venv для Python
 RUN python -m venv /opt/venv

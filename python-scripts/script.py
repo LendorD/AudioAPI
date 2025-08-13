@@ -10,8 +10,7 @@ import subprocess
 from pathlib import Path
 import sys
 from typing import List, Dict, Any
-# from sklearn.cluster import AgglomerativeClustering
-from sklearn.cluster import KMeans
+from scipy.cluster.hierarchy import fcluster, linkage  # Альтернатива для кластеризации
 
 # Конфигурация
 
@@ -30,18 +29,17 @@ else:
     VOSK_MODEL_PATH = os.path.join(base_dir, "models", "vosk-model-ru-0.42")
     SILERO_VAD_PATH = os.path.join(base_dir, "lib", "silero-vad")
 
-
-
 SAMPLE_RATE = 16000
-FFMPEG_PATH = "ffmpeg\\ffmpeg.exe"  # Или полный путь "
+FFMPEG_PATH = os.path.join(base_dir, "ffmpeg", "ffmpeg.exe")
 
 # Инициализация моделей
 def load_models():
     global SILERO_VAD_PATH, VOSK_MODEL_PATH  # Указываем, что используем глобальную переменную
     # 1. Инициализация Silero VAD
     vad_model, utils = torch.hub.load(
-        repo_or_dir='snakers4/silero-vad',
+        repo_or_dir=SILERO_VAD_PATH,
         model='silero_vad',
+        source='local',
         force_reload=True,
         trust_repo=True
     )
@@ -137,14 +135,11 @@ def analyze_audio_file(audio_path: str, num_speakers: int = 2, vad_threshold: fl
 
             features = np.array([extract_features(seg) for seg in speech_segments])
 
-            # 5. Кластеризация
-            if len(features) > 1 and not np.isnan(features).any():
-                try:
-                    clustering = KMeans(n_clusters=min(num_speakers, len(features)))
-                    speaker_labels = clustering.fit_predict(features)
-                except Exception as e:
-                    print(f"Ошибка кластеризации: {e}")
-                    speaker_labels = [0] * len(speech_segments)
+            # 5. Кластеризация (измененная часть)
+            if len(features) > 1:
+                # Используем иерархическую кластеризацию из scipy
+                Z = linkage(features, method='ward')
+                speaker_labels = fcluster(Z, t=num_speakers, criterion='maxclust') - 1  # Приводим к 0-based индексации
             else:
                 speaker_labels = [0] * len(speech_segments)
 
@@ -218,8 +213,8 @@ def main():
 
     # Вывод в JSON (с отступами для читаемости)
     print("-START-")
-    print(segments)
-    # print(json.dumps(segments, indent=2, ensure_ascii=False))
+    # print(segments)
+    print(json.dumps(segments, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":
     main()

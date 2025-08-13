@@ -4,3 +4,4 @@ scikit-learn==1.5.2
 torch==2.5.1
 vosk==0.3.45
 soundfile==0.12.1
+torchaudio==2.5.1

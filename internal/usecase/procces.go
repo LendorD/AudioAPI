@@ -4,6 +4,8 @@ import (
 	"GoRoutine/internal/cache"
 	"GoRoutine/internal/domain/entities"
 	"GoRoutine/internal/interfaces"
+	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -31,9 +33,11 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 		IsRunning: true,
 		StartedAt: startTime,
 	})
-
 	go func(pid uuid.UUID) {
-		cmd := exec.Command("/venv/bin/python", "./python-scripts/script.py", arg1)
+		//					"python"
+		cmd := exec.Command("python", "python-scripts\\script.py", arg1)
+		cmd.Env = append(os.Environ(),
+			"PATH=C:\\Users\\dlucenko\\Desktop\\AudioAPI\\AudioAPI\\venv\\Scripts;"+os.Getenv("PATH"))
 
 		// Собираем stdout и stderr
 		out, err := cmd.CombinedOutput()
@@ -47,10 +51,43 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 		}
 
 		if err != nil {
-			status.Data = "[ERROR]: " + err.Error() + "\n" + string(out)
+			status.Data = fmt.Sprintf("[ERROR]: %v\n%s", err, out)
 		}
 
 		// Обновляем статус в кэше
+		uc.Cache.Set(pid, status)
+	}(id)
+
+	return id
+}
+
+func (uc *ProcessUsecase) StartProcessWithFile(filePath string) uuid.UUID {
+	id, _ := uuid.NewV4()
+	startTime := time.Now()
+
+	uc.Cache.Set(id, &entities.ProcessStatus{
+		IsRunning: true,
+		StartedAt: startTime,
+	})
+
+	go func(pid uuid.UUID) {
+		cmd := exec.Command("python", "./python-scripts/script.py", filePath)
+		out, err := cmd.CombinedOutput()
+
+		os.Remove(filePath)
+
+		finishTime := time.Now()
+		status := &entities.ProcessStatus{
+			IsRunning:  false,
+			StartedAt:  startTime,
+			FinishedAt: &finishTime,
+			Data:       string(out),
+		}
+
+		if err != nil {
+			status.Data = fmt.Sprintf("[ERROR]: %v\n%s", err, out)
+		}
+
 		uc.Cache.Set(pid, status)
 	}(id)
 

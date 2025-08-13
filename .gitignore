@@ -1,3 +1,6 @@
 trash/
 .idea
-python-scripts/
+python-scripts/ffmpeg
+python-scripts/lib
+python-scripts/models
+venv/
