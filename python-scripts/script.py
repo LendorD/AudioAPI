@@ -1,3 +1,4 @@
+import io
 import os
 import tempfile
 import numpy as np
@@ -11,6 +12,10 @@ from pathlib import Path
 import sys
 from typing import List, Dict, Any
 from scipy.cluster.hierarchy import fcluster, linkage  # Альтернатива для кластеризации
+
+# утсановка кодировки
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Конфигурация
 
