@@ -4,3 +4,6 @@ python-scripts/ffmpeg
 python-scripts/lib
 python-scripts/models
 venv/
+build/
+dist/
+tmp_uploads/

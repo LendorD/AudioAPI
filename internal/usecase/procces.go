@@ -34,14 +34,18 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 		IsRunning: true,
 		StartedAt: startTime,
 	})
+
 	go func(pid uuid.UUID) {
 		//					"python"
 		cmd := exec.Command("python", "python-scripts/script.py", arg1)
-		cmd.Env = append(os.Environ(),
-			"PATH=C:\\Users\\dlucenko\\Desktop\\AudioAPI\\AudioAPI\\venv\\Scripts;"+os.Getenv("PATH"))
+
+		// отключаем буферизацию вывода
+		// cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
+
+		// cmd.Env = append(os.Environ(),
+		// 	"PATH=C:\\Users\\dlucenko\\Desktop\\AudioAPI\\AudioAPI\\venv\\Scripts;"+os.Getenv("PATH"))
 
 		out, err := cmd.CombinedOutput()
-
 		finishTime := time.Now()
 
 		status := &entities.ProcessStatus{
@@ -139,4 +143,8 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string) uuid.UUID {
 
 func (uc *ProcessUsecase) GetStatus(id uuid.UUID) (*entities.ProcessStatus, bool) {
 	return uc.Cache.Get(id)
+}
+
+func (uc *ProcessUsecase) GetAllProcessIDs() []uuid.UUID {
+	return uc.Cache.GetAllProcessIDs()
 }

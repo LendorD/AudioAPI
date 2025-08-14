@@ -2,9 +2,10 @@ package cache
 
 import (
 	"GoRoutine/internal/domain/entities"
-	"github.com/gofrs/uuid"
 	"sync"
 	"time"
+
+	"github.com/gofrs/uuid"
 )
 
 type ProcessManager struct {
@@ -42,4 +43,14 @@ func (pm *ProcessManager) CleanupOldProcesses() {
 			delete(pm.store, id)
 		}
 	}
+}
+
+func (c *ProcessManager) GetAllProcessIDs() []uuid.UUID {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ids := make([]uuid.UUID, 0, len(c.store))
+	for id := range c.store {
+		ids = append(ids, id)
+	}
+	return ids
 }
