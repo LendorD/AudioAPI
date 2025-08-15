@@ -54,3 +54,15 @@ func (c *ProcessManager) GetAllProcessIDs() []uuid.UUID {
 	}
 	return ids
 }
+
+func (c *ProcessManager) CountRunning() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	running := 0
+	for _, status := range c.store {
+		if status.IsRunning {
+			running++
+		}
+	}
+	return running
+}

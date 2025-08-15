@@ -15,7 +15,11 @@ import (
 )
 
 func (h *Handler) Start(c *gin.Context) {
-	id := h.usecase.StartProcess()
+	id, err := h.usecase.StartProcess()
+	if err != nil {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"id": id})
 }
 
@@ -74,7 +78,11 @@ func (h *Handler) StartWithFile(c *gin.Context) {
 	}
 
 	// Запускаем процесс с файлом
-	id := h.usecase.StartProcessWithFile(filePath, numSpeakers, vadThreshold)
+	id, err := h.usecase.StartProcessWithFile(filePath, numSpeakers, vadThreshold)
+	if err != nil {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"id": id})
 }
 

@@ -2,27 +2,37 @@ package usecase
 
 import (
 	"GoRoutine/internal/cache"
+	"GoRoutine/internal/config"
 	"GoRoutine/internal/domain/entities"
-	"GoRoutine/internal/interfaces"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gofrs/uuid"
 )
 
 type ProcessUsecase struct {
-	Cache *cache.ProcessManager
+	Cache        *cache.ProcessManager
+	MaxProcesses int
 }
 
-func NewProcessUsecase(c *cache.ProcessManager) interfaces.ProcessUsecase {
-	return &ProcessUsecase{Cache: c}
+func NewProcessUsecase(c *cache.ProcessManager, cfg *config.Config) *ProcessUsecase {
+	maxProc, _ := strconv.Atoi(cfg.Server.MaxProcesses)
+	return &ProcessUsecase{
+		Cache:        c,
+		MaxProcesses: maxProc,
+	}
 }
+func (uc *ProcessUsecase) StartProcess() (uuid.UUID, error) {
+	maxProcesses := uc.MaxProcesses
 
-func (uc *ProcessUsecase) StartProcess() uuid.UUID {
+	if uc.Cache.CountRunning() >= maxProcesses {
+		return uuid.Nil, fmt.Errorf("max number of concurrent processes reached")
+	}
 	// Генерация UUID
 	id, _ := uuid.NewV4()
 
@@ -84,10 +94,16 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 		uc.Cache.Set(pid, status)
 	}(id)
 
-	return id
+	return id, nil
 }
 
-func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int, vadThreshold float64) uuid.UUID {
+func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int, vadThreshold float64) (uuid.UUID, error) {
+	maxProcesses := uc.MaxProcesses
+
+	if uc.Cache.CountRunning() >= maxProcesses {
+		return uuid.Nil, fmt.Errorf("max number of concurrent processes reached")
+	}
+
 	id, _ := uuid.NewV4()
 	startTime := time.Now()
 
@@ -147,7 +163,7 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 		uc.Cache.Set(pid, status)
 	}(id)
 
-	return id
+	return id, nil
 }
 
 func (uc *ProcessUsecase) GetStatus(id uuid.UUID) (*entities.ProcessStatus, bool) {
