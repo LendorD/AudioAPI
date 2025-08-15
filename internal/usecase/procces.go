@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -86,7 +87,7 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 	return id
 }
 
-func (uc *ProcessUsecase) StartProcessWithFile(filePath string) uuid.UUID {
+func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int, vadThreshold float64) uuid.UUID {
 	id, _ := uuid.NewV4()
 	startTime := time.Now()
 
@@ -96,7 +97,14 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string) uuid.UUID {
 	})
 
 	go func(pid uuid.UUID) {
-		cmd := exec.Command("python", "./python-scripts/script.py", filePath)
+		cmd := exec.Command(
+			"python",
+			"./python-scripts/script.py",
+			filePath,
+			fmt.Sprintf("%d", numSpeakers),
+			fmt.Sprintf("%f", vadThreshold),
+		)
+
 		out, err := cmd.CombinedOutput()
 
 		finishTime := time.Now()
@@ -105,6 +113,7 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string) uuid.UUID {
 
 		status := &entities.ProcessStatus{
 			IsRunning:  false,
+			FileName:   filepath.Base(filePath),
 			StartedAt:  startTime,
 			FinishedAt: &finishTime,
 		}

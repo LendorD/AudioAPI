@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gofrs/uuid"
@@ -42,6 +43,22 @@ func (h *Handler) StartWithFile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
 		return
 	}
+	// кол-во говорящих
+	speakersStr := c.DefaultQuery("speakers", "2")
+	// порог детекции речи (0-1)
+	vadStr := c.DefaultQuery("accuracy", "0.5")
+
+	numSpeakers, err := strconv.Atoi(speakersStr)
+	if err != nil || numSpeakers < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid speakers parameter"})
+		return
+	}
+
+	vadThreshold, err := strconv.ParseFloat(vadStr, 64)
+	if err != nil || vadThreshold < 0 || vadThreshold > 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid accuracy parameter"})
+		return
+	}
 
 	// Создаём временную папку, если нет
 	tmpDir := "./tmp_uploads"
@@ -57,7 +74,7 @@ func (h *Handler) StartWithFile(c *gin.Context) {
 	}
 
 	// Запускаем процесс с файлом
-	id := h.usecase.StartProcessWithFile(filePath)
+	id := h.usecase.StartProcessWithFile(filePath, numSpeakers, vadThreshold)
 	c.JSON(http.StatusOK, gin.H{"id": id})
 }
 

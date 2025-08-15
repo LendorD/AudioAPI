@@ -12,7 +12,7 @@ type Usecases interface {
 
 type ProcessUsecase interface {
 	StartProcess() uuid.UUID
-	StartProcessWithFile(filePath string) uuid.UUID
+	StartProcessWithFile(filePath string, numSpeakers int, vadThreshold float64) uuid.UUID
 	GetStatus(id uuid.UUID) (*entities.ProcessStatus, bool)
 	GetAllProcessIDs() []uuid.UUID
 }
