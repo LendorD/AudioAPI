@@ -68,5 +68,26 @@ func SendToAI(apiURL, token, text string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%v", respData), nil
+	// Получаем content из первого choice
+	choices, ok := respData["choices"].([]interface{})
+	if !ok || len(choices) == 0 {
+		return "", fmt.Errorf("no choices in AI response")
+	}
+
+	firstChoice, ok := choices[0].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid choice format")
+	}
+
+	message, ok := firstChoice["message"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid message format")
+	}
+
+	content, ok := message["content"].(string)
+	if !ok {
+		return "", fmt.Errorf("content is not string")
+	}
+
+	return content, nil
 }

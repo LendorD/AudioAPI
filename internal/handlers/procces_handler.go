@@ -86,13 +86,14 @@ func (h *Handler) ProcessAI(c *gin.Context) {
 
 	prompt := fmt.Sprintf(
 		`Вот текст разговора между участниками:\n%s
-		Проанализируй разговор и верни строго JSON с полями:
-		- theme: о чём был разговор (строка)
-		- deal: тип сделки (строка)
-		- deal_description: кратко о деталях сделки
-		- complete_deal: true/false, состоялась ли сделка
-		- deal_price: число, если есть, иначе 0
-		Ответ только JSON.`,
+	Проанализируй разговор и верни массив JSON объектов, по одному на каждую тему обсуждения.
+	Каждый объект должен иметь поля:
+	- theme: о чём была тема (строка)
+	- deal: тип сделки (строка)
+	- deal_description: кратко о деталях сделки
+	- complete_deal: true/false, состоялась ли сделка
+	- deal_price: число, если есть, иначе 0
+	Ответи строго JSON массивом, без лишнего текста.`,
 		text,
 	)
 
@@ -108,10 +109,10 @@ func (h *Handler) ProcessAI(c *gin.Context) {
 		return
 	}
 
-	cleanJSON := service.ExtractJSON(resp)
+	// cleanJSON := service.ExtractJSON(resp)
 
-	var aiResult entities.AIResult
-	if err := json.Unmarshal([]byte(cleanJSON), &aiResult); err != nil {
+	var aiResult []entities.AIResult
+	if err := json.Unmarshal([]byte(resp), &aiResult); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to parse AI response", "raw": resp})
 		return
 	}
@@ -120,7 +121,7 @@ func (h *Handler) ProcessAI(c *gin.Context) {
 	// status.DataFromAI = resp
 	// // Если нужно обновить кэш, можно через метод StartProcess/SetStatus или добавить SetStatus
 	// h.usecase.(*usecases.ProcessUsecase).Cache.Set(procID, status) // только если тип точно ProcessUsecase
-	c.JSON(http.StatusOK, aiResult)
+	// c.JSON(http.StatusOK, aiResult)
 
-	// c.JSON(http.StatusOK, gin.H{"result": aiResult})
+	c.JSON(http.StatusOK, gin.H{"result": aiResult})
 }
