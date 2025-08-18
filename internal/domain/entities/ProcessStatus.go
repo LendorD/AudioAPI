@@ -8,4 +8,5 @@ type ProcessStatus struct {
 	Data       []AudioSegment `json:"data,omitempty"`
 	StartedAt  time.Time      `json:"startedAt"`
 	FinishedAt *time.Time     `json:"finishedAt,omitempty"`
+	AIResult   []AIResult     `json:"aiResul,omitempty"`
 }

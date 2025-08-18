@@ -173,3 +173,23 @@ func (uc *ProcessUsecase) GetStatus(id uuid.UUID) (*entities.ProcessStatus, bool
 func (uc *ProcessUsecase) GetAllProcessIDs() []uuid.UUID {
 	return uc.Cache.GetAllProcessIDs()
 }
+
+func (uc *ProcessUsecase) WaitForCompletion(id uuid.UUID) *entities.ProcessStatus {
+	// блокируемся, пока процесс не завершится
+	for {
+		status, exists := uc.Cache.Get(id)
+		if !exists {
+			return nil
+		}
+		if !status.IsRunning {
+			return status
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (uc *ProcessUsecase) SaveAIResult(id uuid.UUID, result []entities.AIResult) {
+	if status, exists := uc.Cache.Get(id); exists {
+		status.AIResult = result
+	}
+}

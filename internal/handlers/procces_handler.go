@@ -5,6 +5,7 @@ import (
 	"GoRoutine/internal/service"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -47,6 +48,7 @@ func (h *Handler) StartWithFile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
 		return
 	}
+
 	// кол-во говорящих
 	speakersStr := c.DefaultQuery("speakers", "2")
 	// порог детекции речи (0-1)
@@ -108,19 +110,7 @@ func (h *Handler) ProcessAI(c *gin.Context) {
 
 	// Формируем текст
 	text := service.FormatSegments(status.Data)
-
-	prompt := fmt.Sprintf(
-		`Вот текст разговора между участниками:\n%s
-	Проанализируй разговор и верни массив JSON объектов, по одному на каждую тему обсуждения.
-	Каждый объект должен иметь поля:
-	- theme: о чём была тема (строка)
-	- deal: тип сделки (строка)
-	- deal_description: кратко о деталях сделки
-	- complete_deal: true/false, состоялась ли сделка
-	- deal_price: число, если есть, иначе 0
-	Ответи строго JSON массивом, без лишнего текста.`,
-		text,
-	)
+	prompt := fmt.Sprintf(service.AnalysisPrompt, text)
 
 	// отрпавляем в нейронку
 	resp, err := service.SendToAI(
@@ -142,11 +132,64 @@ func (h *Handler) ProcessAI(c *gin.Context) {
 		return
 	}
 
-	// // Сохраняем в статус
-	// status.DataFromAI = resp
-	// // Если нужно обновить кэш, можно через метод StartProcess/SetStatus или добавить SetStatus
-	// h.usecase.(*usecases.ProcessUsecase).Cache.Set(procID, status) // только если тип точно ProcessUsecase
-	// c.JSON(http.StatusOK, aiResult)
-
 	c.JSON(http.StatusOK, gin.H{"result": aiResult})
+}
+
+func (h *Handler) StartFullPipeline(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+
+	speakersStr := c.DefaultQuery("speakers", "2")
+	vadStr := c.DefaultQuery("accuracy", "0.5")
+
+	numSpeakers, _ := strconv.Atoi(speakersStr)
+	vadThreshold, _ := strconv.ParseFloat(vadStr, 64)
+
+	tmpDir := "./tmp_uploads"
+	os.MkdirAll(tmpDir, os.ModePerm)
+	filePath := filepath.Join(tmpDir, file.Filename)
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+		return
+	}
+
+	// запускаем процесс
+	procID, err := h.usecase.StartProcessWithFile(filePath, numSpeakers, vadThreshold)
+	if err != nil {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		return
+	}
+
+	// фоновая горутина: ждём завершение -> запускаем AI
+	go func() {
+		// блокирующий метод ожидания
+		status := h.usecase.WaitForCompletion(procID)
+		if status == nil {
+			return
+		}
+
+		text := service.FormatSegments(status.Data)
+		prompt := fmt.Sprintf(service.AnalysisPrompt, text)
+
+		resp, err := service.SendToAI(
+			"http://192.168.30.230:81/v1/chat/completions",
+			"gpustack_ad0351498a61db96_fcad25d521f3f46e42d590e09d7d499e",
+			prompt,
+		)
+		if err != nil {
+			log.Println("Error from AI: ", err.Error())
+			return
+		}
+
+		var aiResult []entities.AIResult
+		if err := json.Unmarshal([]byte(resp), &aiResult); err == nil {
+			h.usecase.SaveAIResult(procID, aiResult)
+		}
+	}()
+
+	// клиенту сразу возвращаем ID
+	c.JSON(http.StatusOK, gin.H{"id": procID})
 }
