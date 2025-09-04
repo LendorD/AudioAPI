@@ -1,0 +1,4 @@
+*.exe
+*.bin
+testproc.exe
+venv/
