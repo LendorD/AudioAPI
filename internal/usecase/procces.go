@@ -113,13 +113,21 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 	})
 
 	go func(pid uuid.UUID) {
+		exePath := "./python-scripts/dist/audio_analyzer/audio_analyzer.exe" // путь к собранному exe
 		cmd := exec.Command(
-			"python",
-			"./python-scripts/script.py",
+			exePath,
 			filePath,
 			fmt.Sprintf("%d", numSpeakers),
 			fmt.Sprintf("%f", vadThreshold),
 		)
+		//Запуск скрипта
+		// cmd := exec.Command(
+		// 	"python",
+		// 	"./python-scripts/script.py",
+		// 	filePath,
+		// 	fmt.Sprintf("%d", numSpeakers),
+		// 	fmt.Sprintf("%f", vadThreshold),
+		// )
 
 		out, err := cmd.CombinedOutput()
 
