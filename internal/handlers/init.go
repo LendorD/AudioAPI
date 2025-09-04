@@ -40,7 +40,6 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 	//	ExposeHeaders:    []string{"Content-Length"},
 	//	AllowCredentials: true,
 	//}))
-
 	baseRouter := r.Group("/api/v1")
 
 	authorized := baseRouter.Group("/")
