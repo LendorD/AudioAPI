@@ -186,6 +186,7 @@ func (h *Handler) StartFullPipeline(c *gin.Context) {
 
 		var aiResult []entities.AIResult
 		if err := json.Unmarshal([]byte(resp), &aiResult); err == nil {
+			log.Println("Write AI Data to: ", procID)
 			h.usecase.SaveAIResult(procID, aiResult)
 		}
 	}()

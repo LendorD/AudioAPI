@@ -13,6 +13,7 @@ type ServerConfig struct {
 	AllowedOrigins []string
 	AuthToken      string
 	MaxProcesses   string
+	PythonAPIURL   string
 }
 
 type Config struct {
@@ -90,9 +91,10 @@ func LoadConfig() (*Config, error) {
 			},
 			AuthToken:    getEnv("AUTH_TOKEN", ""),
 			MaxProcesses: getEnv("MAX_PROCESSES", "10"),
+			PythonAPIURL: getEnv("PYTHON_API_URL", "http://localhost:8181/api/v1/start"),
 		},
 	}
-
+	fmt.Println("Server Host: ", cfg.HTTPServer.Port)
 	return cfg, nil
 }
 

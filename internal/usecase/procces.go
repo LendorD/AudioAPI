@@ -4,8 +4,12 @@ import (
 	"GoRoutine/internal/cache"
 	"GoRoutine/internal/config"
 	"GoRoutine/internal/domain/entities"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +21,8 @@ import (
 
 type ProcessUsecase struct {
 	Cache        *cache.ProcessManager
+	Client       *http.Client
+	PythonAPI    string
 	MaxProcesses int
 }
 
@@ -24,6 +30,8 @@ func NewProcessUsecase(c *cache.ProcessManager, cfg *config.Config) *ProcessUsec
 	maxProc, _ := strconv.Atoi(cfg.Server.MaxProcesses)
 	return &ProcessUsecase{
 		Cache:        c,
+		Client:       &http.Client{},
+		PythonAPI:    cfg.Server.PythonAPIURL,
 		MaxProcesses: maxProc,
 	}
 }
@@ -98,9 +106,7 @@ func (uc *ProcessUsecase) StartProcess() (uuid.UUID, error) {
 }
 
 func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int, vadThreshold float64) (uuid.UUID, error) {
-	maxProcesses := uc.MaxProcesses
-
-	if uc.Cache.CountRunning() >= maxProcesses {
+	if uc.Cache.CountRunning() >= uc.MaxProcesses {
 		return uuid.Nil, fmt.Errorf("max number of concurrent processes reached")
 	}
 
@@ -113,28 +119,52 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 	})
 
 	go func(pid uuid.UUID) {
-		exePath := "./python-scripts/dist/audio_analyzer/audio_analyzer.exe" // путь к собранному exe
-		cmd := exec.Command(
-			exePath,
-			filePath,
-			fmt.Sprintf("%d", numSpeakers),
-			fmt.Sprintf("%f", vadThreshold),
-		)
-		//Запуск скрипта
-		// cmd := exec.Command(
-		// 	"python",
-		// 	"./python-scripts/script.py",
-		// 	filePath,
-		// 	fmt.Sprintf("%d", numSpeakers),
-		// 	fmt.Sprintf("%f", vadThreshold),
-		// )
+		defer os.Remove(filePath)
 
-		out, err := cmd.CombinedOutput()
+		file, err := os.Open(filePath)
+		if err != nil {
+			uc.Cache.Set(pid, &entities.ProcessStatus{
+				IsRunning: false,
+				FileName:  filepath.Base(filePath),
+				StartedAt: startTime,
+				Data: []entities.AudioSegment{
+					{Start: 0, End: 0, Speaker: "ERROR", Text: "Failed to open file: " + err.Error()},
+				},
+			})
+			return
+		}
+		defer file.Close()
+
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+
+		part, err := writer.CreateFormFile("file", filepath.Base(filePath))
+		if err == nil {
+			_, _ = io.Copy(part, file)
+		}
+
+		_ = writer.WriteField("speakers", fmt.Sprintf("%d", numSpeakers))
+		_ = writer.WriteField("accuracy", fmt.Sprintf("%f", vadThreshold))
+
+		writer.Close()
+
+		req, err := http.NewRequest("POST", uc.PythonAPI, &buf)
+		if err != nil {
+			uc.Cache.Set(pid, &entities.ProcessStatus{
+				IsRunning: false,
+				FileName:  filepath.Base(filePath),
+				StartedAt: startTime,
+				Data: []entities.AudioSegment{
+					{Start: 0, End: 0, Speaker: "ERROR", Text: "Failed to create request: " + err.Error()},
+				},
+			})
+			return
+		}
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		resp, err := uc.Client.Do(req)
 
 		finishTime := time.Now()
-
-		os.Remove(filePath)
-
 		status := &entities.ProcessStatus{
 			IsRunning:  false,
 			FileName:   filepath.Base(filePath),
@@ -142,30 +172,37 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 			FinishedAt: &finishTime,
 		}
 
-		// Если ошибка — оставляем текст ошибки в Data как одно сегментное сообщение
 		if err != nil {
+			status.Data = []entities.AudioSegment{
+				{Start: 0, End: 0, Speaker: "ERROR", Text: "Request failed: " + err.Error()},
+			}
+			uc.Cache.Set(pid, status)
+			return
+		}
+		defer resp.Body.Close()
+
+		body, _ := io.ReadAll(resp.Body)
+
+		if resp.StatusCode != http.StatusOK {
+			status.Data = []entities.AudioSegment{
+				{Start: 0, End: 0, Speaker: "ERROR", Text: fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(body))},
+			}
+			uc.Cache.Set(pid, status)
+			return
+		}
+
+		var parsed entities.PythonAPIResponse
+		if err := json.Unmarshal(body, &parsed); err != nil {
 			status.Data = []entities.AudioSegment{
 				{
 					Start:   0,
 					End:     0,
 					Speaker: "ERROR",
-					Text:    fmt.Sprintf("%v\n%s", err, string(out)),
+					Text:    fmt.Sprintf("Failed to parse JSON: %v\n%s", err, string(body)),
 				},
 			}
 		} else {
-			// Парсим JSON, который вернул Python
-			var segments []entities.AudioSegment
-			if err := json.Unmarshal(out, &segments); err != nil {
-				segments = []entities.AudioSegment{
-					{
-						Start:   0,
-						End:     0,
-						Speaker: "ERROR",
-						Text:    fmt.Sprintf("Failed to parse JSON: %v\n%s", err, string(out)),
-					},
-				}
-			}
-			status.Data = segments
+			status.Data = parsed.Results.Result
 		}
 
 		uc.Cache.Set(pid, status)

@@ -23,7 +23,7 @@ func New() *fx.App {
 }
 func InvokeHttpServer(lc fx.Lifecycle, h http.Handler) {
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + config.DefaultServerConfig().Port,
 		Handler: h,
 	}
 
