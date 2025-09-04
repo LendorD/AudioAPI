@@ -12,6 +12,7 @@ type ServerConfig struct {
 	Port           string
 	AllowedOrigins []string
 	AuthToken      string
+	MaxProcesses   string
 }
 
 type Config struct {
@@ -87,7 +88,8 @@ func LoadConfig() (*Config, error) {
 				"http://127.0.0.1:3000",
 				"http://127.0.0.1:5173",
 			},
-			AuthToken: getEnv("AUTH_TOKEN", ""),
+			AuthToken:    getEnv("AUTH_TOKEN", ""),
+			MaxProcesses: getEnv("MAX_PROCESSES", "10"),
 		},
 	}
 

@@ -2,29 +2,43 @@ package usecase
 
 import (
 	"GoRoutine/internal/cache"
+	"GoRoutine/internal/config"
 	"GoRoutine/internal/domain/entities"
-	"GoRoutine/internal/interfaces"
-	"github.com/gofrs/uuid"
+	"encoding/json"
+	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"time"
+
+	"github.com/gofrs/uuid"
 )
 
 type ProcessUsecase struct {
-	Cache *cache.ProcessManager
+	Cache        *cache.ProcessManager
+	MaxProcesses int
 }
 
-func NewProcessUsecase(c *cache.ProcessManager) interfaces.ProcessUsecase {
-	return &ProcessUsecase{Cache: c}
+func NewProcessUsecase(c *cache.ProcessManager, cfg *config.Config) *ProcessUsecase {
+	maxProc, _ := strconv.Atoi(cfg.Server.MaxProcesses)
+	return &ProcessUsecase{
+		Cache:        c,
+		MaxProcesses: maxProc,
+	}
 }
+func (uc *ProcessUsecase) StartProcess() (uuid.UUID, error) {
+	maxProcesses := uc.MaxProcesses
 
-func (uc *ProcessUsecase) StartProcess() uuid.UUID {
+	if uc.Cache.CountRunning() >= maxProcesses {
+		return uuid.Nil, fmt.Errorf("max number of concurrent processes reached")
+	}
 	// Генерация UUID
 	id, _ := uuid.NewV4()
 
 	startTime := time.Now()
 
-	arg1 := id.String()
-	arg2 := time.Now().Format("2006-01-02 15:04:05")
+	arg1 := "test.mp3"
 
 	// Сохраняем процесс как запущенный
 	uc.Cache.Set(id, &entities.ProcessStatus{
@@ -33,29 +47,157 @@ func (uc *ProcessUsecase) StartProcess() uuid.UUID {
 	})
 
 	go func(pid uuid.UUID) {
-		cmd := exec.Command("./testproc.exe", arg1, arg2)
-		// Собираем stdout и stderr
-		out, err := cmd.CombinedOutput()
+		//					"python"
+		cmd := exec.Command("python", "python-scripts/script.py", arg1)
 
+		// отключаем буферизацию вывода
+		// cmd.Env = append(os.Environ(), "PYTHONUNBUFFERED=1")
+
+		// cmd.Env = append(os.Environ(),
+		// 	"PATH=C:\\Users\\dlucenko\\Desktop\\AudioAPI\\AudioAPI\\venv\\Scripts;"+os.Getenv("PATH"))
+
+		out, err := cmd.CombinedOutput()
 		finishTime := time.Now()
+
 		status := &entities.ProcessStatus{
 			IsRunning:  false,
 			StartedAt:  startTime,
 			FinishedAt: &finishTime,
-			Data:       string(out),
 		}
 
 		if err != nil {
-			status.Data = "[ERROR]: " + err.Error()
+			status.Data = []entities.AudioSegment{
+				{
+					Start:   0,
+					End:     0,
+					Speaker: "ERROR",
+					Text:    fmt.Sprintf("%v\n%s", err, string(out)),
+				},
+			}
+		} else {
+			// Парсим JSON, который вернул Python
+			var segments []entities.AudioSegment
+			if err := json.Unmarshal(out, &segments); err != nil {
+				segments = []entities.AudioSegment{
+					{
+						Start:   0,
+						End:     0,
+						Speaker: "ERROR",
+						Text:    fmt.Sprintf("Failed to parse JSON: %v\n%s", err, string(out)),
+					},
+				}
+			}
+			status.Data = segments
 		}
 
 		// Обновляем статус в кэше
 		uc.Cache.Set(pid, status)
 	}(id)
 
-	return id
+	return id, nil
+}
+
+func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int, vadThreshold float64) (uuid.UUID, error) {
+	maxProcesses := uc.MaxProcesses
+
+	if uc.Cache.CountRunning() >= maxProcesses {
+		return uuid.Nil, fmt.Errorf("max number of concurrent processes reached")
+	}
+
+	id, _ := uuid.NewV4()
+	startTime := time.Now()
+
+	uc.Cache.Set(id, &entities.ProcessStatus{
+		IsRunning: true,
+		StartedAt: startTime,
+	})
+
+	go func(pid uuid.UUID) {
+		exePath := "./python-scripts/dist/audio_analyzer/audio_analyzer.exe" // путь к собранному exe
+		cmd := exec.Command(
+			exePath,
+			filePath,
+			fmt.Sprintf("%d", numSpeakers),
+			fmt.Sprintf("%f", vadThreshold),
+		)
+		//Запуск скрипта
+		// cmd := exec.Command(
+		// 	"python",
+		// 	"./python-scripts/script.py",
+		// 	filePath,
+		// 	fmt.Sprintf("%d", numSpeakers),
+		// 	fmt.Sprintf("%f", vadThreshold),
+		// )
+
+		out, err := cmd.CombinedOutput()
+
+		finishTime := time.Now()
+
+		os.Remove(filePath)
+
+		status := &entities.ProcessStatus{
+			IsRunning:  false,
+			FileName:   filepath.Base(filePath),
+			StartedAt:  startTime,
+			FinishedAt: &finishTime,
+		}
+
+		// Если ошибка — оставляем текст ошибки в Data как одно сегментное сообщение
+		if err != nil {
+			status.Data = []entities.AudioSegment{
+				{
+					Start:   0,
+					End:     0,
+					Speaker: "ERROR",
+					Text:    fmt.Sprintf("%v\n%s", err, string(out)),
+				},
+			}
+		} else {
+			// Парсим JSON, который вернул Python
+			var segments []entities.AudioSegment
+			if err := json.Unmarshal(out, &segments); err != nil {
+				segments = []entities.AudioSegment{
+					{
+						Start:   0,
+						End:     0,
+						Speaker: "ERROR",
+						Text:    fmt.Sprintf("Failed to parse JSON: %v\n%s", err, string(out)),
+					},
+				}
+			}
+			status.Data = segments
+		}
+
+		uc.Cache.Set(pid, status)
+	}(id)
+
+	return id, nil
 }
 
 func (uc *ProcessUsecase) GetStatus(id uuid.UUID) (*entities.ProcessStatus, bool) {
 	return uc.Cache.Get(id)
+}
+
+func (uc *ProcessUsecase) GetAllProcessIDs() []uuid.UUID {
+	return uc.Cache.GetAllProcessIDs()
+}
+
+func (uc *ProcessUsecase) WaitForCompletion(id uuid.UUID) *entities.ProcessStatus {
+	// блокируемся, пока процесс не завершится
+	for {
+		status, exists := uc.Cache.Get(id)
+		if !exists {
+			return nil
+		}
+		if !status.IsRunning {
+			return status
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (uc *ProcessUsecase) SaveAIResult(id uuid.UUID, result []entities.AIResult) {
+	if status, exists := uc.Cache.Get(id); exists {
+		status.AIResult = result
+	}
 }
