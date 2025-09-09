@@ -53,5 +53,16 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 		authorized.POST("/start_full_pipeline", h.StartFullPipeline)
 	}
 
+	baseRouterV2 := r.Group("/api/v2")
+
+	authorizedV2 := baseRouterV2.Group("/")
+	authorizedV2.Use(h.authMiddleware())
+
+	{
+		authorizedV2.POST("/start", h.StartWithFileAI)
+		authorizedV2.GET("/status/:proc_id", h.GetStatus)
+		authorizedV2.GET("/ids", h.GetAllProcessIDs)
+	}
+
 	return r
 }

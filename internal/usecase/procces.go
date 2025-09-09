@@ -35,6 +35,7 @@ func NewProcessUsecase(c *cache.ProcessManager, cfg *config.Config) *ProcessUsec
 		MaxProcesses: maxProc,
 	}
 }
+
 func (uc *ProcessUsecase) StartProcess() (uuid.UUID, error) {
 	maxProcesses := uc.MaxProcesses
 

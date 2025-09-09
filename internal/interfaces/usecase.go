@@ -8,6 +8,7 @@ import (
 
 type Usecases interface {
 	ProcessUsecase
+	ProcessUsecaseAI
 }
 
 type ProcessUsecase interface {
@@ -17,4 +18,8 @@ type ProcessUsecase interface {
 	GetAllProcessIDs() []uuid.UUID
 	WaitForCompletion(id uuid.UUID) *entities.ProcessStatus
 	SaveAIResult(id uuid.UUID, result []entities.AIResult)
+}
+
+type ProcessUsecaseAI interface {
+	StartProcessWithFileAI(filePath string, numSpeakers int, vadThreshold float64) (uuid.UUID, error)
 }
