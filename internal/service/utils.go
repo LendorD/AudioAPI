@@ -33,7 +33,7 @@ func ExtractJSON(raw string) string {
 	return raw
 }
 
-func SendToAI(apiURL, token, text string) (string, error) {
+func ThemeRecognitionAI(apiURL, token, text string) (string, error) {
 	reqBody := entities.ChatRequest{
 		Temperature:      0.8,
 		TopP:             0.95,

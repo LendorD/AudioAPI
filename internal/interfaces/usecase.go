@@ -17,9 +17,10 @@ type ProcessUsecase interface {
 	GetStatus(id uuid.UUID) (*entities.ProcessStatus, bool)
 	GetAllProcessIDs() []uuid.UUID
 	WaitForCompletion(id uuid.UUID) *entities.ProcessStatus
-	SaveAIResult(id uuid.UUID, result []entities.AIResult)
+	SaveDealAnalysisResult(id uuid.UUID, result []entities.AIResult) error
 }
 
 type ProcessUsecaseAI interface {
 	StartProcessWithFileAI(filePath string, numSpeakers int, vadThreshold float64) (uuid.UUID, error)
+	SaveToxicityAnalysisResult(id uuid.UUID, result entities.ToxicityAnalysis) error
 }

@@ -49,11 +49,21 @@ func (uc *ProcessUsecase) StartProcess() (uuid.UUID, error) {
 
 	arg1 := "test.mp3"
 
+	initialStatus := &entities.ProcessStatusV1{
+		ProcessStatusCommon: entities.ProcessStatusCommon{
+			IsRunning: true,
+			StartedAt: startTime,
+		},
+	}
+
+	// Оборачиваем в универсальный ProcessStatus
+	status := &entities.ProcessStatus{
+		Type: "v1",
+		Data: initialStatus,
+	}
+
 	// Сохраняем процесс как запущенный
-	uc.Cache.Set(id, &entities.ProcessStatus{
-		IsRunning: true,
-		StartedAt: startTime,
-	})
+	uc.Cache.Set(id, status)
 
 	go func(pid uuid.UUID) {
 		//					"python"
@@ -68,14 +78,16 @@ func (uc *ProcessUsecase) StartProcess() (uuid.UUID, error) {
 		out, err := cmd.CombinedOutput()
 		finishTime := time.Now()
 
-		status := &entities.ProcessStatus{
-			IsRunning:  false,
-			StartedAt:  startTime,
-			FinishedAt: &finishTime,
+		v1Data := &entities.ProcessStatusV1{
+			ProcessStatusCommon: entities.ProcessStatusCommon{
+				IsRunning:  false,
+				StartedAt:  startTime,
+				FinishedAt: &finishTime,
+			},
 		}
 
 		if err != nil {
-			status.Data = []entities.AudioSegment{
+			v1Data.Data = []entities.AudioSegment{
 				{
 					Start:   0,
 					End:     0,
@@ -96,11 +108,14 @@ func (uc *ProcessUsecase) StartProcess() (uuid.UUID, error) {
 					},
 				}
 			}
-			status.Data = segments
+			v1Data.Data = segments
 		}
 
 		// Обновляем статус в кэше
-		uc.Cache.Set(pid, status)
+		uc.Cache.Set(pid, &entities.ProcessStatus{
+			Type: "v1",
+			Data: v1Data,
+		})
 	}(id)
 
 	return id, nil
@@ -114,23 +129,38 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 	id, _ := uuid.NewV4()
 	startTime := time.Now()
 
-	uc.Cache.Set(id, &entities.ProcessStatus{
-		IsRunning: true,
-		StartedAt: startTime,
-	})
+	initialStatus := &entities.ProcessStatusV1{
+		ProcessStatusCommon: entities.ProcessStatusCommon{
+			IsRunning: true,
+			StartedAt: startTime,
+		},
+	}
+
+	status := &entities.ProcessStatus{
+		Type: "v1",
+		Data: initialStatus,
+	}
+
+	uc.Cache.Set(id, status)
 
 	go func(pid uuid.UUID) {
 		defer os.Remove(filePath)
 
 		file, err := os.Open(filePath)
 		if err != nil {
-			uc.Cache.Set(pid, &entities.ProcessStatus{
-				IsRunning: false,
-				FileName:  filepath.Base(filePath),
-				StartedAt: startTime,
+			errorStatus := &entities.ProcessStatusV1{
+				ProcessStatusCommon: entities.ProcessStatusCommon{
+					IsRunning: false,
+					FileName:  filepath.Base(filePath),
+					StartedAt: startTime,
+				},
 				Data: []entities.AudioSegment{
 					{Start: 0, End: 0, Speaker: "ERROR", Text: "Failed to open file: " + err.Error()},
 				},
+			}
+			uc.Cache.Set(pid, &entities.ProcessStatus{
+				Type: "v1",
+				Data: errorStatus,
 			})
 			return
 		}
@@ -151,13 +181,19 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 
 		req, err := http.NewRequest("POST", uc.PythonAPI, &buf)
 		if err != nil {
-			uc.Cache.Set(pid, &entities.ProcessStatus{
-				IsRunning: false,
-				FileName:  filepath.Base(filePath),
-				StartedAt: startTime,
+			errorStatus := &entities.ProcessStatusV1{
+				ProcessStatusCommon: entities.ProcessStatusCommon{
+					IsRunning: false,
+					FileName:  filepath.Base(filePath),
+					StartedAt: startTime,
+				},
 				Data: []entities.AudioSegment{
 					{Start: 0, End: 0, Speaker: "ERROR", Text: "Failed to create request: " + err.Error()},
 				},
+			}
+			uc.Cache.Set(pid, &entities.ProcessStatus{
+				Type: "v1",
+				Data: errorStatus,
 			})
 			return
 		}
@@ -166,18 +202,24 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 		resp, err := uc.Client.Do(req)
 
 		finishTime := time.Now()
-		status := &entities.ProcessStatus{
-			IsRunning:  false,
-			FileName:   filepath.Base(filePath),
-			StartedAt:  startTime,
-			FinishedAt: &finishTime,
+
+		v1Data := &entities.ProcessStatusV1{
+			ProcessStatusCommon: entities.ProcessStatusCommon{
+				IsRunning:  false,
+				FileName:   filepath.Base(filePath),
+				StartedAt:  startTime,
+				FinishedAt: &finishTime,
+			},
 		}
 
 		if err != nil {
-			status.Data = []entities.AudioSegment{
+			v1Data.Data = []entities.AudioSegment{
 				{Start: 0, End: 0, Speaker: "ERROR", Text: "Request failed: " + err.Error()},
 			}
-			uc.Cache.Set(pid, status)
+			uc.Cache.Set(pid, &entities.ProcessStatus{
+				Type: "v1",
+				Data: v1Data,
+			})
 			return
 		}
 		defer resp.Body.Close()
@@ -188,7 +230,10 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 			status.Data = []entities.AudioSegment{
 				{Start: 0, End: 0, Speaker: "ERROR", Text: fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(body))},
 			}
-			uc.Cache.Set(pid, status)
+			uc.Cache.Set(pid, &entities.ProcessStatus{
+				Type: "v1",
+				Data: v1Data,
+			})
 			return
 		}
 
@@ -203,10 +248,13 @@ func (uc *ProcessUsecase) StartProcessWithFile(filePath string, numSpeakers int,
 				},
 			}
 		} else {
-			status.Data = parsed.Results.Result
+			v1Data.Data = parsed.Results.Result
 		}
 
-		uc.Cache.Set(pid, status)
+		uc.Cache.Set(pid, &entities.ProcessStatus{
+			Type: "v1",
+			Data: v1Data,
+		})
 	}(id)
 
 	return id, nil
@@ -221,21 +269,34 @@ func (uc *ProcessUsecase) GetAllProcessIDs() []uuid.UUID {
 }
 
 func (uc *ProcessUsecase) WaitForCompletion(id uuid.UUID) *entities.ProcessStatus {
-	// блокируемся, пока процесс не завершится
 	for {
 		status, exists := uc.Cache.Get(id)
 		if !exists {
 			return nil
 		}
-		if !status.IsRunning {
-			return status
+
+		// Проверяем, завершён ли процесс — смотрим внутрь Data
+		if v1, ok := status.Data.(*entities.ProcessStatusV1); ok {
+			if !v1.IsRunning {
+				return status
+			}
+		} else if v2, ok := status.Data.(*entities.ProcessStatusV2); ok {
+			if !v2.IsRunning {
+				return status
+			}
 		}
+
 		time.Sleep(10 * time.Second)
 	}
 }
 
-func (uc *ProcessUsecase) SaveAIResult(id uuid.UUID, result []entities.AIResult) {
+func (uc *ProcessUsecase) SaveDealAnalysisResult(id uuid.UUID, result []entities.AIResult) error {
 	if status, exists := uc.Cache.Get(id); exists {
-		status.AIResult = result
+		if v1, ok := status.Data.(*entities.ProcessStatusV1); ok {
+			v1.AIResult = result
+			uc.Cache.Set(id, status)
+			return nil
+		}
 	}
+	return fmt.Errorf("process not found or not V1 type")
 }

@@ -19,9 +19,18 @@ type ServerConfig struct {
 type Config struct {
 	App        AppConfig
 	HTTPServer HTTPConfig
+	Database   DatabaseConfig
 	Services   Services
 	Server     ServerConfig // Добавляем ServerConfig в основную структуру
 	JWTSecret  string
+}
+
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	Username string
+	Password string
+	DBName   string
 }
 
 func DefaultServerConfig() ServerConfig {
@@ -78,6 +87,13 @@ func LoadConfig() (*Config, error) {
 			MobileApp: Service{
 				Host: getEnv("API_URL", "http://localhost:8080"),
 			},
+		},
+		Database: DatabaseConfig{
+			Host:     getEnv("DB_HOST", "192.168.29.138"),
+			Port:     getEnv("DB_PORT", "5432"),
+			Username: getEnv("DB_USER", "postgres"),
+			Password: getEnv("DB_PASSWORD", "password"),
+			DBName:   getEnv("DB_NAME", "db_name"),
 		},
 		Server: ServerConfig{ // Явно инициализируем Server
 			Port: getEnv("SERVER_PORT", "8080"),

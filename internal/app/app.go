@@ -3,7 +3,9 @@ package app
 import (
 	"GoRoutine/internal/cache"
 	"GoRoutine/internal/config"
+	"GoRoutine/internal/db"
 	"GoRoutine/internal/handlers"
+	"GoRoutine/internal/repositories"
 	usecases "GoRoutine/internal/usecase"
 	"context"
 	"net/http"
@@ -16,6 +18,7 @@ func New() *fx.App {
 		fx.Provide(
 			config.LoadConfig,
 		),
+		RepositoryModule,
 		UsecaseModule,
 		HttpServerModule,
 		CacheModule,
@@ -46,9 +49,12 @@ var HttpServerModule = fx.Module("http_server_module",
 	fx.Invoke(InvokeHttpServer),
 )
 
-//var ServiceModule = fx.Module("service_module",
-//	fx.Provide(services.NewService),
-//)
+var RepositoryModule = fx.Module("postgres_module",
+	fx.Provide(
+		db.NewDB,
+		repositories.NewProccesRepository,
+	),
+)
 
 var UsecaseModule = fx.Module("usecases_module",
 	fx.Provide(

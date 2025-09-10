@@ -109,11 +109,11 @@ func (h *Handler) ProcessAI(c *gin.Context) {
 	}
 
 	// Формируем текст
-	text := service.FormatSegments(status.Data)
+	text := service.FormatSegments(status.Data.(*entities.ProcessStatusV1).Data)
 	prompt := fmt.Sprintf(service.AnalysisPrompt, text)
 
 	// отрпавляем в нейронку
-	resp, err := service.SendToAI(
+	resp, err := service.ThemeRecognitionAI(
 		"http://192.168.30.230:81/v1/chat/completions",
 		"gpustack_ad0351498a61db96_fcad25d521f3f46e42d590e09d7d499e",
 		prompt,
@@ -171,10 +171,10 @@ func (h *Handler) StartFullPipeline(c *gin.Context) {
 			return
 		}
 
-		text := service.FormatSegments(status.Data)
+		text := service.FormatSegments(status.Data.(*entities.ProcessStatusV1).Data)
 		prompt := fmt.Sprintf(service.AnalysisPrompt, text)
 
-		resp, err := service.SendToAI(
+		resp, err := service.ThemeRecognitionAI(
 			"http://192.168.30.230:81/v1/chat/completions",
 			"gpustack_ad0351498a61db96_fcad25d521f3f46e42d590e09d7d499e",
 			prompt,
@@ -187,7 +187,7 @@ func (h *Handler) StartFullPipeline(c *gin.Context) {
 		var aiResult []entities.AIResult
 		if err := json.Unmarshal([]byte(resp), &aiResult); err == nil {
 			log.Println("Write AI Data to: ", procID)
-			h.usecase.SaveAIResult(procID, aiResult)
+			h.usecase.SaveDealAnalysisResult(procID, aiResult)
 		}
 	}()
 

@@ -38,8 +38,23 @@ func (pm *ProcessManager) CleanupOldProcesses() {
 	defer pm.mu.Unlock()
 
 	now := time.Now()
+	cutoff := now.Add(-24 * time.Hour) // записи старше этого времени — удаляем
+
 	for id, status := range pm.store {
-		if status.FinishedAt != nil && now.Sub(*status.FinishedAt) > 24*time.Hour {
+		var startedAt time.Time
+
+		switch v := status.Data.(type) {
+		case *entities.ProcessStatusV1:
+			startedAt = v.StartedAt
+		case *entities.ProcessStatusV2:
+			startedAt = v.StartedAt
+		default:
+			// Неизвестный тип — пропускаем или логируем
+			continue
+		}
+
+		// Если процесс стартовал раньше cutoff — удаляем
+		if startedAt.Before(cutoff) {
 			delete(pm.store, id)
 		}
 	}
@@ -58,9 +73,10 @@ func (c *ProcessManager) GetAllProcessIDs() []uuid.UUID {
 func (c *ProcessManager) CountRunning() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	running := 0
 	for _, status := range c.store {
-		if status.IsRunning {
+		if status.GetIsRunning() {
 			running++
 		}
 	}

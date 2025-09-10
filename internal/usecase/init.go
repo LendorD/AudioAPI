@@ -11,9 +11,9 @@ type UseCases struct {
 	interfaces.ProcessUsecaseAI
 }
 
-func NewUsecases(c *cache.ProcessManager, cfg *config.Config) interfaces.Usecases {
+func NewUsecases(r interfaces.ProccesRepository, c *cache.ProcessManager, cfg *config.Config) interfaces.Usecases {
 	return &UseCases{
 		ProcessUsecase:   NewProcessUsecase(c, cfg),
-		ProcessUsecaseAI: NewProcessUsecaseAI(c, cfg),
+		ProcessUsecaseAI: NewProcessUsecaseAI(r, c, cfg),
 	}
 }
