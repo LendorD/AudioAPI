@@ -59,7 +59,8 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 	authorizedV2.Use(h.authMiddleware())
 
 	{
-		authorizedV2.POST("/start", h.StartWithFileAI)
+		authorizedV2.GET("/files", h.GetFilesName)
+		authorizedV2.POST("/start_file", h.StartWithFileAI)
 		authorizedV2.GET("/status/:proc_id", h.GetStatus)
 		authorizedV2.GET("/ids", h.GetAllProcessIDs)
 		authorizedV2.POST("/start_toxicity_pipeline", h.StartToxicityAnalysisPipeline)

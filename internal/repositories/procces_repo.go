@@ -28,7 +28,7 @@ type proccesRepository struct {
 
 func NewProccesRepository(db *gorm.DB) interfaces.ProccesRepository {
 	// Автомиграция
-	db.AutoMigrate(&ProcessRecord{})
+	// db.AutoMigrate(&ProcessRecord{})
 	return &proccesRepository{db: db}
 }
 

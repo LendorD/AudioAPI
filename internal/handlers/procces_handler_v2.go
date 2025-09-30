@@ -5,14 +5,61 @@ import (
 	"GoRoutine/internal/service"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+func (h *Handler) GetFilesName(c *gin.Context) {
+	// 1. Получаем токен с внешнего сервиса
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get("http://192.168.9.77:9105/token")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch token: " + err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": fmt.Sprintf("token service returned status %d", resp.StatusCode),
+		})
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read token response: " + err.Error()})
+		return
+	}
+
+	// Предполагаем, что токен приходит в теле как plain text (а не JSON)
+	// Если приходит JSON — см. примечание ниже
+	token := strings.TrimSpace(string(body))
+	if token == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "received empty token"})
+		return
+	}
+
+	// 2. Передаём токен в вашу функцию
+	records, err := service.MikoGetFilesName(token)
+	if err != nil {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"records": records})
+}
 
 func (h *Handler) StartWithFileAI(c *gin.Context) {
 	// Получаем файл

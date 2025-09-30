@@ -6,7 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
+	"strings"
+	"time"
+
+	"gitlab.e-m-l.ru/ai-integration/audio/miko/models"
+	"gitlab.e-m-l.ru/ai-integration/audio/miko/pkg"
 )
 
 func FormatSegments(segments []entities.AudioSegment) string {
@@ -90,4 +96,31 @@ func ThemeRecognitionAI(apiURL, token, text string) (string, error) {
 	}
 
 	return content, nil
+}
+
+func MikoGetFilesName(token string) ([]models.Record, error) {
+	miko := pkg.NewMiko("http://192.168.9.119", token)
+	now := time.Now()
+	records, _, _, err := miko.GetNewRecords(now, now, 20, 0)
+	if err != nil {
+		fmt.Printf("error getting records: %v", err)
+		return nil, err
+	}
+	for _, value := range records {
+		params := make(map[string]string)
+		params["view"] = value.RecordingFilePath
+		params["download"] = "1"
+		params["filename"] = value.Date + "_" + value.From + "_" + value.To + ".mp3"
+		var file []byte
+		file, err = miko.DownloadFile(params)
+		if err != nil {
+			fmt.Printf("error downloading file: %v", err)
+			continue
+		}
+		err = os.WriteFile("./"+strings.ReplaceAll(strings.ReplaceAll(params["filename"], ":", "-"), " ", "_"), file, 666)
+		if err != nil {
+			fmt.Printf("failed to write file: %v", err)
+		}
+	}
+	return records, nil
 }

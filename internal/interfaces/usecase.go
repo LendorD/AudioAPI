@@ -21,6 +21,7 @@ type ProcessUsecase interface {
 }
 
 type ProcessUsecaseAI interface {
+	// StartFullProcess(numSpeakers int, vadThreshold float64) (uuid.UUID, error)
 	StartProcessWithFileAI(filePath string, numSpeakers int, vadThreshold float64) (uuid.UUID, error)
 	SaveToxicityAnalysisResult(id uuid.UUID, result entities.ToxicityAnalysis) error
 }
