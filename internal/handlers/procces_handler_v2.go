@@ -3,6 +3,7 @@ package handlers
 import (
 	"GoRoutine/internal/domain/entities"
 	"GoRoutine/internal/service"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +13,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gofrs/uuid"
 )
 
 func (h *Handler) GetFilesName(c *gin.Context) {
@@ -59,6 +62,139 @@ func (h *Handler) GetFilesName(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"records": records})
+}
+
+func (h *Handler) ProcessAllDownloadedFiles(c *gin.Context) {
+	downloadDir := "./miko_downloads"
+
+	// Проверяем существование директории
+	if _, err := os.Stat(downloadDir); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no downloaded files found"})
+		return
+	}
+
+	// Получаем параметры из query
+	speakersStr := c.DefaultQuery("speakers", "2")
+	accuracyStr := c.DefaultQuery("accuracy", "0.5")
+
+	numSpeakers, err := strconv.Atoi(speakersStr)
+	if err != nil || numSpeakers < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid 'speakers' parameter"})
+		return
+	}
+
+	vadThreshold, err := strconv.ParseFloat(accuracyStr, 64)
+	if err != nil || vadThreshold < 0 || vadThreshold > 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid 'accuracy' parameter"})
+		return
+	}
+
+	// Читаем файлы
+	entries, err := os.ReadDir(downloadDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read download directory"})
+		return
+	}
+
+	var filePaths []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		// Опционально: фильтр по расширению
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".mp3" && ext != ".wav" && ext != ".ogg" && ext != ".flac" {
+			continue
+		}
+		filePaths = append(filePaths, filepath.Join(downloadDir, entry.Name()))
+	}
+
+	if len(filePaths) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"message":           "no audio files found in download directory",
+			"started_processes": []string{},
+		})
+		return
+	}
+
+	// ⚙️ Настройки параллелизма
+	maxWorkers := 5 // можно вынести в конфиг или параметр
+	jobs := make(chan string, len(filePaths))
+	results := make(chan struct {
+		ID    uuid.UUID
+		Error string
+	}, len(filePaths))
+
+	var wg sync.WaitGroup
+
+	// Запускаем воркеров
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for filePath := range jobs {
+				id, err := h.usecase.StartProcessWithFileAI(filePath, numSpeakers, vadThreshold)
+				if err != nil {
+					results <- struct {
+						ID    uuid.UUID
+						Error string
+					}{ID: uuid.Nil, Error: fmt.Sprintf("file %s: %v", filepath.Base(filePath), err)}
+				} else {
+					results <- struct {
+						ID    uuid.UUID
+						Error string
+					}{ID: id, Error: ""}
+				}
+			}
+		}()
+	}
+
+	// Отправляем задачи
+	go func() {
+		defer close(jobs)
+		for _, path := range filePaths {
+			jobs <- path
+		}
+	}()
+
+	// Ждём завершения воркеров
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Собираем результаты с таймаутом (на случай зависания)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	var processIDs []uuid.UUID
+	var errors []string
+
+	for {
+		select {
+		case res, ok := <-results:
+			if !ok {
+				// Канал закрыт — все результаты получены
+				c.JSON(http.StatusOK, gin.H{
+					"started_processes": processIDs,
+					"errors":            errors,
+				})
+				return
+			}
+			if res.Error != "" {
+				errors = append(errors, res.Error)
+			} else {
+				processIDs = append(processIDs, res.ID)
+			}
+		case <-ctx.Done():
+			// Таймаут — возвращаем то, что успели
+			c.JSON(http.StatusPartialContent, gin.H{
+				"started_processes": processIDs,
+				"errors":            append(errors, "timeout while waiting for all processes to start"),
+			})
+			return
+		}
+	}
 }
 
 func (h *Handler) StartWithFileAI(c *gin.Context) {
@@ -191,4 +327,26 @@ func (h *Handler) StartToxicityAnalysisPipeline(c *gin.Context) {
 
 	// Клиенту сразу возвращаем ID
 	c.JSON(http.StatusOK, gin.H{"id": procID})
+}
+
+func (h *Handler) GetAllProcessIDs(c *gin.Context) {
+	ids := h.usecase.GetAllProcessIDs()
+	c.JSON(http.StatusOK, gin.H{"IDs": ids})
+}
+
+func (h *Handler) GetStatus(c *gin.Context) {
+	rawId := c.Param("proc_id")
+	id, err := uuid.FromString(rawId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	status, ok := h.usecase.GetStatus(id)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "process not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": status})
 }

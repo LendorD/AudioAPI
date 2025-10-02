@@ -244,3 +244,33 @@ func (uc *ProcessUsecaseAI) SaveToxicityAnalysisResult(id uuid.UUID, result enti
 	}
 	return fmt.Errorf("process not found or not V2 type")
 }
+
+func (uc *ProcessUsecaseAI) WaitForCompletion(id uuid.UUID) *entities.ProcessStatus {
+	for {
+		status, exists := uc.Cache.Get(id)
+		if !exists {
+			return nil
+		}
+
+		// Проверяем, завершён ли процесс — смотрим внутрь Data
+		if v1, ok := status.Data.(*entities.ProcessStatusV1); ok {
+			if !v1.IsRunning {
+				return status
+			}
+		} else if v2, ok := status.Data.(*entities.ProcessStatusV2); ok {
+			if !v2.IsRunning {
+				return status
+			}
+		}
+
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (uc *ProcessUsecaseAI) GetStatus(id uuid.UUID) (*entities.ProcessStatus, bool) {
+	return uc.Cache.Get(id)
+}
+
+func (uc *ProcessUsecaseAI) GetAllProcessIDs() []uuid.UUID {
+	return uc.Cache.GetAllProcessIDs()
+}

@@ -40,18 +40,6 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 	//	ExposeHeaders:    []string{"Content-Length"},
 	//	AllowCredentials: true,
 	//}))
-	baseRouter := r.Group("/api/v1")
-
-	authorized := baseRouter.Group("/")
-	authorized.Use(h.authMiddleware())
-	{
-		authorized.GET("/start", h.Start)
-		authorized.POST("/start", h.StartWithFile)
-		authorized.GET("/status/:proc_id", h.GetStatus)
-		authorized.GET("/ids", h.GetAllProcessIDs)
-		authorized.POST("/process_ai/:proc_id", h.ProcessAI)
-		authorized.POST("/start_full_pipeline", h.StartFullPipeline)
-	}
 
 	baseRouterV2 := r.Group("/api/v2")
 
@@ -60,6 +48,7 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 
 	{
 		authorizedV2.GET("/files", h.GetFilesName)
+		authorizedV2.POST("/process-all-downloaded", h.ProcessAllDownloadedFiles)
 		authorizedV2.POST("/start_file", h.StartWithFileAI)
 		authorizedV2.GET("/status/:proc_id", h.GetStatus)
 		authorizedV2.GET("/ids", h.GetAllProcessIDs)
