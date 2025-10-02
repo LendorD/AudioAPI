@@ -100,6 +100,7 @@ func ThemeRecognitionAI(apiURL, token, text string) (string, error) {
 	return content, nil
 }
 
+// TODO: Сделать получение даты
 func MikoGetFilesName(token string) ([]models.Record, error) {
 	downloadDir := "./miko_downloads"
 	if err := os.MkdirAll(downloadDir, os.ModePerm); err != nil {

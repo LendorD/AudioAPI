@@ -20,7 +20,6 @@ import (
 )
 
 func (h *Handler) GetFilesName(c *gin.Context) {
-	// 1. Получаем токен с внешнего сервиса
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
@@ -45,15 +44,12 @@ func (h *Handler) GetFilesName(c *gin.Context) {
 		return
 	}
 
-	// Предполагаем, что токен приходит в теле как plain text (а не JSON)
-	// Если приходит JSON — см. примечание ниже
 	token := strings.TrimSpace(string(body))
 	if token == "" {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "received empty token"})
 		return
 	}
 
-	// 2. Передаём токен в вашу функцию
 	records, err := service.MikoGetFilesName(token)
 	if err != nil {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
@@ -250,7 +246,7 @@ func (h *Handler) processAllFilesInParallel(filePaths []string, numSpeakers int,
 	log.Printf("Completed toxicity analysis for %d files", len(filePaths))
 }
 
-// Обработка одного файла (как в StartToxicityAnalysisPipeline)
+// Обработка одного файла
 func (h *Handler) processSingleFileWithToxicity(filePath string, numSpeakers int, vadThreshold float64) {
 	log.Printf("Starting pipeline for: %s", filepath.Base(filePath))
 
