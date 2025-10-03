@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -65,15 +66,25 @@ func ThemeRecognitionAI(apiURL, token, text string) (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read AI response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("AI server returned HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
 	var respData map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&respData); err != nil {
-		return "", err
+	if err := json.Unmarshal(respBody, &respData); err != nil {
+		return "", fmt.Errorf("parse JSON response: %w (raw: %s)", err, string(respBody))
 	}
 
 	// Получаем content из первого choice
@@ -101,15 +112,14 @@ func ThemeRecognitionAI(apiURL, token, text string) (string, error) {
 }
 
 // TODO: Сделать получение даты
-func MikoGetFilesName(token string) ([]models.Record, error) {
+func MikoGetFilesName(token string, from, to time.Time) ([]models.Record, error) {
 	downloadDir := "./miko_downloads"
 	if err := os.MkdirAll(downloadDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("failed to create download dir: %w", err)
 	}
 
 	miko := pkg.NewMiko("http://192.168.9.119", token)
-	now := time.Now()
-	records, _, _, err := miko.GetNewRecords(now, now, 20, 0)
+	records, _, _, err := miko.GetNewRecords(from, to, 20, 0)
 	if err != nil {
 		fmt.Printf("error getting records: %v", err)
 		return nil, err

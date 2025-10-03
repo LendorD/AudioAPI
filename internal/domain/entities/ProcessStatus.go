@@ -1,6 +1,15 @@
 package entities
 
-import "time"
+import (
+	"time"
+
+	"github.com/gofrs/uuid"
+)
+
+type ProcessWithFile struct {
+	ID       uuid.UUID
+	FileName string
+}
 
 // ProcessStatusCommon — общие поля для всех версий
 type ProcessStatusCommon struct {

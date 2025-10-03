@@ -54,3 +54,32 @@ func (r *proccesRepository) UpdateToxicityAnalysis(id uuid.UUID, analysis entiti
 		Update("toxicity_analysis", ToxicityResult(analysis)).
 		Error
 }
+
+func (r *proccesRepository) GetHighToxicityProcesses() ([]entities.ProcessWithFile, error) {
+	var records []struct {
+		ID       uuid.UUID `gorm:"column:id"`
+		FileName string    `gorm:"column:file_name"`
+	}
+
+	// Ищем записи, где toxicity_analysis->>'toxicity_level' IN ('medium', 'high')
+	// Регистронезависимо: приводим к нижнему регистру
+	err := r.db.Raw(`
+		SELECT id, file_name
+		FROM process_records
+		WHERE LOWER(toxicity_analysis->>'toxicity_level') IN ('medium', 'high')
+	`).Scan(&records).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]entities.ProcessWithFile, len(records))
+	for i, rec := range records {
+		result[i] = entities.ProcessWithFile{
+			ID:       rec.ID,
+			FileName: rec.FileName,
+		}
+	}
+
+	return result, nil
+}
