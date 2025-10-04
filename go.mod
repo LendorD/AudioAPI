@@ -55,3 +55,5 @@ require (
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.30.5
 )
+
+replace gitlab.e-m-l.ru/ai-integration/audio/miko => ../miko

@@ -83,10 +83,6 @@ github.com/twitchyliquid64/golang-asm v0.15.1 h1:SU5vSMR7hnwNxj24w34ZyCi/FmDZTkS
 github.com/twitchyliquid64/golang-asm v0.15.1/go.mod h1:a1lVb/DtPvCB8fslRZhAngC2+aY1QWCk3Cedj/Gdt08=
 github.com/ugorji/go/codec v1.3.0 h1:Qd2W2sQawAfG8XSvzwhBeoGq71zXOC/Q1E9y/wUcsUA=
 github.com/ugorji/go/codec v1.3.0/go.mod h1:pRBVtBSKl77K30Bv8R2P+cLSGaTtex6fsA2Wjqmfxj4=
-gitlab.e-m-l.ru/ai-integration/audio/miko v0.0.0-20250923090048-dbb1c8700671 h1:HFzFDeXV4irvzavbjKx4//T5YNWOKsAE3aCdyZbzaF0=
-gitlab.e-m-l.ru/ai-integration/audio/miko v0.0.0-20250923090048-dbb1c8700671/go.mod h1:lDYT30QQXWdhikgng9IvCUz/l5nHtaGsDjUQR65ixvE=
-gitlab.e-m-l.ru/ai-integration/audio/miko v0.0.0-20250929122517-defa220bd5b5 h1:o8XBWhathMTrkKzJPJQmu1jeqL7vMVxg8WdTpsF1hOg=
-gitlab.e-m-l.ru/ai-integration/audio/miko v0.0.0-20250929122517-defa220bd5b5/go.mod h1:lDYT30QQXWdhikgng9IvCUz/l5nHtaGsDjUQR65ixvE=
 go.uber.org/dig v1.19.0 h1:BACLhebsYdpQ7IROQ1AGPjrXcP5dF80U3gKoFzbaq/4=
 go.uber.org/dig v1.19.0/go.mod h1:Us0rSJiThwCv2GteUN0Q7OKvU7n5J4dxZ9JKUXozFdE=
 go.uber.org/fx v1.24.0 h1:wE8mruvpg2kiiL1Vqd0CC+tr0/24XIB10Iwp2lLWzkg=

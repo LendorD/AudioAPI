@@ -7,7 +7,7 @@ import (
 )
 
 type ProccesRepository interface {
-	SaveProcess(id uuid.UUID, v2 *entities.ProcessStatusV2) error
+	SaveToxicProcess(id uuid.UUID, v2 *entities.ProcessStatusV2) error
 	UpdateToxicityAnalysis(id uuid.UUID, analysis entities.ToxicityAnalysis) error
 	// В интерфейсе
 	GetHighToxicityProcesses() ([]entities.ProcessWithFile, error)

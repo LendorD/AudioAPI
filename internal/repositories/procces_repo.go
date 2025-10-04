@@ -32,7 +32,7 @@ func NewProccesRepository(db *gorm.DB) interfaces.ProccesRepository {
 	return &proccesRepository{db: db}
 }
 
-func (r *proccesRepository) SaveProcess(id uuid.UUID, v2 *entities.ProcessStatusV2) error {
+func (r *proccesRepository) SaveToxicProcess(id uuid.UUID, v2 *entities.ProcessStatusV2) error {
 	if v2.DataRaw == nil {
 		return fmt.Errorf("DataRaw is nil")
 	}
