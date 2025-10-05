@@ -145,7 +145,7 @@ func (h *Handler) processSingleFileWithToxicity(filePath string, numSpeakers int
 		return
 	}
 
-	log.Printf("✅ Toxicity analysis completed for %s", procID)
+	log.Printf("Toxicity analysis completed for %s", procID)
 }
 
 func (h *Handler) ProcessSingleFileWithToxicity(c *gin.Context) {

@@ -50,9 +50,19 @@ func ProvideRouter(h *Handler, cfg *config.Config) http.Handler {
 		authorizedV2.GET("/files", h.GetFilesName)
 		authorizedV2.GET("/status/:proc_id", h.GetStatus)
 		authorizedV2.GET("/ids", h.GetAllProcessIDs)
+
+		//Анализ всех файлов на токсичность
 		authorizedV2.POST("/process-all-toxicity", h.ProcessAllWithToxicityAnalysis)
+
+		//Анализ файлов с выосокой токсчиность на темы
 		authorizedV2.POST("/process-toxic-full-analysis", h.ProcessToxicFilesWithFullAnalysis)
+
+		//Анализ 1 файла на токсичность
 		authorizedV2.POST("/process-single", h.ProcessSingleFileWithToxicity)
+
+		//Анализ всех файлов на темы
+		authorizedV2.POST("/process-all-speaker-ai", h.ProcessAllFilesWithSpeakerDiarizationAndAI)
+
 		// authorizedV2.POST("/start_toxicity_pipeline", h.StartToxicityAnalysisPipeline)
 	}
 

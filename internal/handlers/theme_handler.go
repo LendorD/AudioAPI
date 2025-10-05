@@ -20,7 +20,7 @@ func (h *Handler) ProcessToxicFilesWithFullAnalysis(c *gin.Context) {
 	// 1. Получаем все токсичные процессы из БД
 	processes, err := h.usecase.GetHighToxicityProcessesFromDB()
 	if err != nil {
-		log.Printf("❌ Failed to fetch toxic processes: %v", err)
+		log.Printf("Failed to fetch toxic processes: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
 		return
 	}
@@ -45,7 +45,7 @@ func (h *Handler) ProcessToxicFilesWithFullAnalysis(c *gin.Context) {
 			}
 		}
 		if !found {
-			log.Printf("⚠️ File not found: %s", proc.FileName)
+			log.Printf("File not found: %s", proc.FileName)
 		}
 	}
 
@@ -81,19 +81,24 @@ func (h *Handler) processToxicFilesInParallel(filePaths []string, processes []en
 		}()
 	}
 
-	// Сопоставляем файлы с ID (упрощённо — по индексу)
-	for i, path := range filePaths {
-		if i < len(processes) {
+	fileToID := make(map[string]uuid.UUID)
+	for _, p := range processes {
+		fileToID[p.FileName] = p.ID
+	}
+
+	for _, path := range filePaths {
+		fileName := filepath.Base(path)
+		if id, exists := fileToID[fileName]; exists {
 			jobs <- struct {
 				Path string
 				ID   uuid.UUID
-			}{Path: path, ID: processes[i].ID}
+			}{Path: path, ID: id}
 		}
 	}
 	close(jobs)
 
 	wg.Wait()
-	log.Printf("✅ Completed full analysis for %d toxic files", len(filePaths))
+	log.Printf("Completed full analysis for %d toxic files", len(filePaths))
 }
 
 // Обрабатывает один токсичный файл: V1 → AI тематика
@@ -103,25 +108,25 @@ func (h *Handler) processToxicFileWithFullAnalysis(filePath string, originalProc
 	// 1. Запускаем V1-обработку (по спикерам)
 	v1ProcID, err := h.usecase.StartDetailProcessWithFile(filePath, 2, 0.5)
 	if err != nil {
-		log.Printf("❌ Failed to start speaker diarization for %s: %v", originalProcID, err)
+		log.Printf("Failed to start speaker diarization for %s: %v", originalProcID, err)
 		return
 	}
 
 	// 2. Ждём завершения V1
 	status := h.usecase.WaitForCompletion(v1ProcID)
 	if status == nil {
-		log.Printf("❌ No status for V1 process %s", v1ProcID)
+		log.Printf("No status for V1 process %s", v1ProcID)
 		return
 	}
 
 	v1, ok := status.Data.(*entities.ProcessStatusV1)
 	if !ok {
-		log.Printf("❌ Unexpected type for V1 process %s", v1ProcID)
+		log.Printf("Unexpected type for V1 process %s", v1ProcID)
 		return
 	}
 
 	if len(v1.Data) == 0 {
-		log.Printf("❌ No segments for V1 process %s", v1ProcID)
+		log.Printf("No segments for V1 process %s", v1ProcID)
 		return
 	}
 
@@ -135,19 +140,19 @@ func (h *Handler) processToxicFileWithFullAnalysis(filePath string, originalProc
 		prompt,
 	)
 	if err != nil {
-		log.Printf("❌ AI error for V1 process %s: %v", v1ProcID, err)
+		log.Printf("AI error for V1 process %s: %v", v1ProcID, err)
 		return
 	}
 
 	// 4. Парсим результат
 	var aiResult []entities.AIResult
 	if err := json.Unmarshal([]byte(resp), &aiResult); err != nil {
-		log.Printf("❌ Failed to parse AI response for %s: %v (raw: %s)", v1ProcID, err, resp)
+		log.Printf("Failed to parse AI response for %s: %v (raw: %s)", v1ProcID, err, resp)
 		return
 	}
 
 	// 5. Сохраняем в V1-процесс
 	h.usecase.SaveDealAnalysisResult(originalProcID, aiResult)
 
-	log.Printf("✅ Full analysis completed for toxic file %s → V1: %s", originalProcID, v1ProcID)
+	log.Printf("Full analysis completed for toxic file %s → V1: %s", originalProcID, v1ProcID)
 }
